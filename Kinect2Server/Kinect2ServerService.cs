@@ -132,7 +132,7 @@ namespace PersonalRobotics.Kinect2Server
             this.colorArray = new byte[(this.kinect.ColorFrameSource.FrameDescription.Height * this.kinect.ColorFrameSource.FrameDescription.Width * BYTES_PER_COLOR_PIXEL)];
             this.depthArray = new ushort[this.kinect.DepthFrameSource.FrameDescription.Height * this.kinect.DepthFrameSource.FrameDescription.Width];
             this.irArray = new ushort[this.kinect.InfraredFrameSource.FrameDescription.Height * this.kinect.InfraredFrameSource.FrameDescription.Width];
-            this.byteColorArray = new byte[(this.kinect.ColorFrameSource.FrameDescription.Height * this.kinect.ColorFrameSource.FrameDescription.Width * BYTES_PER_COLOR_PIXEL) + sizeof(double)];
+            this.byteColorArray = new byte[(this.kinect.ColorFrameSource.FrameDescription.Height * this.kinect.ColorFrameSource.FrameDescription.Width * 3) + sizeof(double)];
             this.byteDepthArray = new byte[this.kinect.DepthFrameSource.FrameDescription.Height * this.kinect.DepthFrameSource.FrameDescription.Width * BYTES_PER_DEPTH_PIXEL + sizeof(double)];
             this.byteIRArray = new byte[this.kinect.InfraredFrameSource.FrameDescription.Height * this.kinect.InfraredFrameSource.FrameDescription.Width * BYTES_PER_IR_PIXEL + sizeof(double)];
             this.bodyArray = new Body[this.kinect.BodyFrameSource.BodyCount];
@@ -184,9 +184,36 @@ namespace PersonalRobotics.Kinect2Server
             {
                 if (colorFrame != null)
                 {
-                    colorFrame.CopyConvertedFrameDataToArray(this.colorArray, ColorImageFormat.Bgra);
-                    System.Buffer.BlockCopy(this.colorArray, 0, this.byteColorArray,0,(this.kinect.ColorFrameSource.FrameDescription.Height * this.kinect.ColorFrameSource.FrameDescription.Width * BYTES_PER_COLOR_PIXEL));
-                    System.Buffer.BlockCopy(BitConverter.GetBytes(utcTime), 0, this.byteColorArray, (this.kinect.ColorFrameSource.FrameDescription.Height * this.kinect.ColorFrameSource.FrameDescription.Width * BYTES_PER_COLOR_PIXEL), sizeof(double));
+                    colorFrame.CopyConvertedFrameDataToArray(this.colorArray, ColorImageFormat.Rgba);
+                    int width = this.kinect.ColorFrameSource.FrameDescription.Width;
+                    int height = this.kinect.ColorFrameSource.FrameDescription.Height;
+                    for (int i=0; i< width*height; i++)
+                    {
+                        this.byteColorArray[3*i] = this.colorArray[4*i];
+                        this.byteColorArray[3*i+1] = this.colorArray[4*i+1];
+                        this.byteColorArray[3*i+2] = this.colorArray[4*i+2];
+                    }
+                    /*
+                    byte tmp;
+                    for (int j = 0; j < height; j++)
+                    {
+                        for (int i=0; i<width/2;i++)
+                        {
+                            tmp = this.byteColorArray[3 * (j * width + i)];
+                            this.byteColorArray[3 * (j * width + i)] = this.byteColorArray[3 * (j * width + (width - i))];
+                            this.byteColorArray[3 * (j * width + (width - i))] = tmp;
+
+                            tmp = this.byteColorArray[3 * (j * width + i) + 1];
+                            this.byteColorArray[3 * (j * width + i) + 1] = this.byteColorArray[3 * (j * width + (width - i)) + 1];
+                            this.byteColorArray[3 * (j * width + (width - i)) + 1] = tmp;
+
+                            tmp = this.byteColorArray[3 * (j * width + i) + 2];
+                            this.byteColorArray[3 * (j * width + i) + 2] = this.byteColorArray[3 * (j * width + (width - i)) + 2];
+                            this.byteColorArray[3 * (j * width + (width - i)) + 2] = tmp;
+                        }
+                    }
+                    */
+                    System.Buffer.BlockCopy(BitConverter.GetBytes(utcTime), 0, this.byteColorArray, (this.kinect.ColorFrameSource.FrameDescription.Height * this.kinect.ColorFrameSource.FrameDescription.Width * 3), sizeof(double));
                     this.colorConnector.Broadcast(this.byteColorArray);
                 }
             }
@@ -218,6 +245,13 @@ namespace PersonalRobotics.Kinect2Server
                 if (bodyFrame != null)
                 {
                     bodyFrame.GetAndRefreshBodyData(this.bodyArray);
+                    for ( int i = 0 ; i < this.bodyArray.Length ; i++ )
+                    {
+                        if ( this.bodyArray[i].IsTracked )
+                        {
+                            ulong a = this.bodyArray[i].TrackingId;
+                        }
+                    }
                     string jsonString = JsonConvert.SerializeObject(this.bodyArray);
                     int diff = 28000 - jsonString.Length;
                     for (int i = 0; i < diff;i++ )

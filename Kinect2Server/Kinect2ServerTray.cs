@@ -100,5 +100,23 @@ namespace PersonalRobotics.Kinect2Server
             // Remove the placeholder form.
             base.Dispose(isDisposing);
         }
+
+        private void InitializeComponent()
+        {
+            this.SuspendLayout();
+            // 
+            // Kinect2ServerTray
+            // 
+            this.ClientSize = new System.Drawing.Size(501, 368);
+            this.Name = "Kinect2ServerTray";
+            this.Load += new System.EventHandler(this.Kinect2ServerTray_Load);
+            this.ResumeLayout(false);
+
+        }
+
+        private void Kinect2ServerTray_Load(object sender, EventArgs e)
+        {
+
+        }
     }
 }
