@@ -29,7 +29,11 @@ using System.Diagnostics;
 using System.ServiceProcess;
 using System.Windows.Media;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Newtonsoft.Json;
+using Emgu.CV;
+using Emgu.CV.Structure;
+using Emgu.Util;
 
 namespace PersonalRobotics.Kinect2Server
 {
@@ -187,34 +191,29 @@ namespace PersonalRobotics.Kinect2Server
                     colorFrame.CopyConvertedFrameDataToArray(this.colorArray, ColorImageFormat.Rgba);
                     int width = this.kinect.ColorFrameSource.FrameDescription.Width;
                     int height = this.kinect.ColorFrameSource.FrameDescription.Height;
+                    
                     for (int i=0; i< width*height; i++)
                     {
                         this.byteColorArray[3*i] = this.colorArray[4*i];
                         this.byteColorArray[3*i+1] = this.colorArray[4*i+1];
                         this.byteColorArray[3*i+2] = this.colorArray[4*i+2];
                     }
-                    /*
-                    byte tmp;
-                    for (int j = 0; j < height; j++)
-                    {
-                        for (int i=0; i<width/2;i++)
-                        {
-                            tmp = this.byteColorArray[3 * (j * width + i)];
-                            this.byteColorArray[3 * (j * width + i)] = this.byteColorArray[3 * (j * width + (width - i))];
-                            this.byteColorArray[3 * (j * width + (width - i))] = tmp;
 
-                            tmp = this.byteColorArray[3 * (j * width + i) + 1];
-                            this.byteColorArray[3 * (j * width + i) + 1] = this.byteColorArray[3 * (j * width + (width - i)) + 1];
-                            this.byteColorArray[3 * (j * width + (width - i)) + 1] = tmp;
-
-                            tmp = this.byteColorArray[3 * (j * width + i) + 2];
-                            this.byteColorArray[3 * (j * width + i) + 2] = this.byteColorArray[3 * (j * width + (width - i)) + 2];
-                            this.byteColorArray[3 * (j * width + (width - i)) + 2] = tmp;
-                        }
-                    }
-                    */
-                    System.Buffer.BlockCopy(BitConverter.GetBytes(utcTime), 0, this.byteColorArray, (this.kinect.ColorFrameSource.FrameDescription.Height * this.kinect.ColorFrameSource.FrameDescription.Width * 3), sizeof(double));
-                    this.colorConnector.Broadcast(this.byteColorArray);
+                    byte[] downsampledArray = new byte[1280 * 720 * 3 + sizeof(double)];
+                    GCHandle pinnedSrcImageArray = GCHandle.Alloc(this.byteColorArray, GCHandleType.Pinned);
+                    GCHandle pinnedDownsampledImageArray = GCHandle.Alloc(downsampledArray, GCHandleType.Pinned);
+                    IntPtr srcImagePointer = pinnedSrcImageArray.AddrOfPinnedObject();
+                    IntPtr dstImagePointer = pinnedDownsampledImageArray.AddrOfPinnedObject();
+                    Mat srcImage = new Mat(height, width, Emgu.CV.CvEnum.DepthType.Cv8U, 3, srcImagePointer, 3 * width);
+                    Mat downsampledImage = new Mat(720, 1280, Emgu.CV.CvEnum.DepthType.Cv8U, 3, dstImagePointer, 3 * 1280);
+                    CvInvoke.Resize(srcImage, downsampledImage, new System.Drawing.Size(1280, 720));
+                    CvInvoke.Flip(downsampledImage, downsampledImage, Emgu.CV.CvEnum.FlipType.Horizontal);
+                    
+                   
+                    System.Buffer.BlockCopy(BitConverter.GetBytes(utcTime), 0, downsampledArray, (/*this.kinect.ColorFrameSource.FrameDescription.Height * this.kinect.ColorFrameSource.FrameDescription.Width*/1280*720 * 3), sizeof(double));
+                    this.colorConnector.Broadcast(downsampledArray);
+                    pinnedSrcImageArray.Free();
+                    pinnedDownsampledImageArray.Free();
                 }
             }
 
